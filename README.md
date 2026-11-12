@@ -1,6 +1,14 @@
 # script-to-explainer
 
+![Bit walks on, waves and presents a slide](docs/demo.gif)
+
 Turn a JSON script into a narrated 1080p explainer video, rendered locally with one command.
+
+Full example video (720p, 51 s, 2 MB): [docs/demo-720p.mp4](docs/demo-720p.mp4). The 1080p version is what `render` produces from `examples/demo.json`.
+
+## Who it is for
+
+Short product demo videos, tutorials, release walkthroughs and onboarding clips where you want a narrated, animated video from text you can edit and version, without a video editor, a cloud service or a recording session.
 Bit, a small pixel-art robot, presents your slides: he walks on and off the stage, points at the slide, waves, shrugs and celebrates on the words you choose, and his mouth follows the voice. One card morphs between slides, text springs in, key words get highlighted, a camera drifts and zooms, and captions fill word by word.
 
 No cloud, no account: the voice (Kokoro) runs on your machine. Python directs (voice, word timing, stage plan); an HTML/GSAP composition drawn by [HyperFrames](https://github.com/heygen-com/hyperframes) renders the picture.
@@ -91,6 +99,14 @@ Without a cue the planner adds gestures by rule (greeting, question, goodbye, "t
 Choose at render time: `python -m explainer render demo.json --engine azure`, or override `--voice`, `--speed`, `--pause-comma`, `--pause-period`.
 To add another engine, implement `synthesize(text) -> (samples, sample_rate)` in `src/explainer/tts/` and register it in `tts/__init__.py`.
 Set `EXPLAINER_MODELS` to keep the Kokoro model files somewhere else (default: `./models`).
+
+## Limitations
+
+- Narration is English only for now (the default Kokoro voices); other languages need another engine.
+- Bit is the only character, and the slides are the three built-in types. Custom layouts mean editing `src/explainer/hf/`.
+- Word timing without the optional `align` extra is estimated (about 250 ms error), so a gesture can land slightly off its word.
+- A 1080p render of a one-minute script takes a few minutes on a laptop CPU; the first run also downloads the voice model.
+- Tested on Windows; Linux and macOS should work but have not been exercised.
 
 ## Tests
 
