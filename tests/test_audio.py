@@ -73,3 +73,21 @@ def test_mouth_closes_in_silence_and_follows_volume():
     x = np.concatenate([np.zeros(12000), (0.3 * np.sin(2 * np.pi * 200 * t)).astype(np.float32), np.zeros(12000)])
     lv = A.mouth_levels(x, 30)
     assert lv[3] == 0 and lv[-3] == 0 and lv[30] == 2
+
+
+def test_whisper_refine_replaces_matched_words_and_interpolates_the_rest():
+    from explainer import align as AL
+
+    ws = A.distribute_words("one two three four five", 0.0, 2.5, 0)
+    heard = [("one", 0.10, 0.4), ("two", 0.55, 0.9), ("four", 1.6, 1.9), ("five", 2.0, 2.4)]
+    out = AL.refine(ws, heard)
+    assert [w.text for w in out] == ["one", "two", "three", "four", "five"]
+    assert abs(out[0].t0 - 0.10) < 1e-9 and abs(out[3].t0 - 1.6) < 1e-9
+    assert 0.9 <= out[2].t0 <= 1.6                       # "three" was not heard: placed between its neighbours
+    assert all(a.t0 <= b.t0 for a, b in zip(out, out[1:]))
+
+
+def test_proportional_words_stay_in_order_and_inside_the_clause():
+    ws = A.distribute_words("Hello there my friend", 1.0, 3.0, 0)
+    assert abs(ws[0].t0 - 1.0) < 1e-9 and abs(ws[-1].t1 - 3.0) < 1e-9
+    assert all(a.t1 <= b.t0 + 1e-9 for a, b in zip(ws, ws[1:]))

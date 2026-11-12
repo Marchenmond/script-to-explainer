@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .actions import ACTIONS
+from .actions import ACTIONS, STAGE_ACTIONS
 
 EMOTIONS = ("neutral", "happy", "thinking", "pointing")
 SLIDE_TYPES = ("title", "bullets", "highlight")
@@ -24,6 +24,11 @@ class Scene:
     pause_after: float = 0.5
     cues: list[dict] = field(default_factory=list)
     speed: float | None = None                  # speech speed override for this scene (voice speed multiplier)
+    lead: float | None = None                   # silence before the narration starts (default 0.5 s)
+    camera: list[dict] = field(default_factory=list)   # [{on, view, zoom?}]
+    emph: list[dict] = field(default_factory=list)     # [{on, target, style: mark|pop}]
+    reveal: list[dict] = field(default_factory=list)   # [{item, on}]
+    count: list[dict] = field(default_factory=list)    # [{item|target, from, to, suffix, on, ms}]
 
 
 @dataclass
@@ -33,6 +38,8 @@ class Script:
     voice: dict = field(default_factory=dict)
     direction: dict = field(default_factory=dict)
     pauses: dict = field(default_factory=dict)  # silence per punctuation, seconds (see audio.DEFAULT_PAUSES)
+    align: str = "proportional"                 # word timing: proportional | whisper | auto (whisper if installed)
+    stage: dict = field(default_factory=dict)   # stations, walking, camera views, card states (see stage.DEFAULT_STAGE)
 
 
 def split_sentences(text: str) -> list[str]:
@@ -49,8 +56,13 @@ def _parse_cues(raw, where: str) -> list[dict]:
         w = f"{where}, cue {j}"
         if not isinstance(c, dict):
             raise ScriptError(f"{w}: must be an object")
-        if c.get("do") not in ACTIONS:
-            raise ScriptError(f"{w}: unknown action {c.get('do')!r} (use one of {', '.join(ACTIONS)})")
+        c = dict(c)
+        if "action" in c and "do" not in c:
+            c["do"] = c.pop("action")
+        if c.get("do") not in ACTIONS and c.get("do") not in STAGE_ACTIONS:
+            raise ScriptError(f"{w}: unknown action {c.get('do')!r} (use one of {', '.join([*ACTIONS, *STAGE_ACTIONS])})")
+        if c.get("face") not in (None, "camera", "slide"):
+            raise ScriptError(f"{w}: 'face' must be 'camera' or 'slide'")
         anchors = [k for k in ("on", "word", "at") if k in c]
         if len(anchors) != 1:
             raise ScriptError(f"{w}: give exactly one of 'on', 'word' or 'at'")
@@ -98,11 +110,21 @@ def parse(data: dict) -> Script:
         if not isinstance(pause, (int, float)) or isinstance(pause, bool) or not 0 <= pause <= 10:
             raise ScriptError(f"{where}: 'pause_after' must be a number between 0 and 10")
         cues = _parse_cues(s.get("cues", []), where)
+        lead = s.get("lead")
+        if lead is not None and (not isinstance(lead, (int, float)) or isinstance(lead, bool) or not 0 <= lead <= 5):
+            raise ScriptError(f"{where}: 'lead' must be a number between 0 and 5")
+        extras = {}
+        for k in ("camera", "emph", "reveal", "count"):
+            v = s.get(k, [])
+            if not isinstance(v, list) or not all(isinstance(x, dict) for x in v):
+                raise ScriptError(f"{where}: '{k}' must be a list of objects")
+            extras[k] = v
         speed = s.get("speed")
         if speed is not None and (not isinstance(speed, (int, float)) or isinstance(speed, bool) or not 0.5 <= speed <= 2):
             raise ScriptError(f"{where}: 'speed' must be a number between 0.5 and 2")
         scenes.append(Scene(say=say.strip(), emotion=emotion, slide={**slide, "type": stype}, pause_after=float(pause),
-                            cues=cues, speed=None if speed is None else float(speed)))
+                            cues=cues, speed=None if speed is None else float(speed),
+                            lead=None if lead is None else float(lead), **extras))
     voice = data.get("voice", {})
     if not isinstance(voice, dict):
         raise ScriptError("'voice' must be an object")
@@ -113,7 +135,14 @@ def parse(data: dict) -> Script:
     for k, v in pauses.items():
         if not isinstance(v, (int, float)) or isinstance(v, bool) or not 0 <= v <= 5:
             raise ScriptError(f"'pauses.{k}' must be a number of seconds between 0 and 5")
-    return Script(title=str(data.get("title", "Untitled")), scenes=scenes, voice=voice, direction=direction, pauses=pauses)
+    align = data.get("align", "proportional")
+    if align not in ("auto", "proportional", "whisper"):
+        raise ScriptError("'align' must be auto, proportional or whisper")
+    stage = data.get("stage", {})
+    if not isinstance(stage, dict):
+        raise ScriptError("'stage' must be an object")
+    return Script(title=str(data.get("title", "Untitled")), scenes=scenes, voice=voice, direction=direction, pauses=pauses,
+                  stage=stage, align=align)
 
 
 def load(path: str | Path) -> Script:

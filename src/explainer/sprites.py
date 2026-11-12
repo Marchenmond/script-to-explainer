@@ -111,3 +111,27 @@ class Bit:
         big = im.resize((CELL * self.scale, CELL * self.scale), Image.NEAREST)
         self._cache[key] = big
         return big
+
+
+@lru_cache(maxsize=4)
+def sole_shifts(tag: str) -> tuple[int, ...]:
+    """How far (sprite pixels) the soles move between each frame of a walk tag and the next one (wraps around).
+
+    Measured on the two bottom rows of the sheet: the shift that best lines the soles of frame k up with
+    frame k+1. This is how far the body must travel while frame k shows so the supporting foot does not skate.
+    """
+    import numpy as np
+
+    sheet = Image.open(_dir() / "poses.png").convert("RGBA")
+    frames = []
+    for f in _meta()[tag]:
+        i = f["i"]
+        x, y = (i % 16) * CELL, (i // 16) * CELL
+        a = np.array(sheet.crop((x, y, x + CELL, y + CELL)))[:, :, 3] > 0
+        frames.append(a[56:59])
+    out = []
+    for k, a in enumerate(frames):
+        b = frames[(k + 1) % len(frames)]
+        best = min(range(-8, 9), key=lambda s: ((a != np.roll(b, -s, axis=1)).sum(), abs(s)))
+        out.append(abs(best))
+    return tuple(out)

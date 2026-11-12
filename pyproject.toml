@@ -13,12 +13,13 @@ dependencies = ["pillow", "numpy", "soundfile", "kokoro-onnx"]
 
 [project.optional-dependencies]
 dev = ["pytest"]
+align = ["faster-whisper"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-explainer = ["assets/bit/*", "assets/fonts/*"]
+explainer = ["assets/bit/*", "assets/fonts/*", "hf/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,9 @@
+{
+  "name": "script-to-explainer-motion",
+  "private": true,
+  "description": "Pinned tools for the motion layer (HyperFrames renders the HTML composition; GSAP drives the timeline). Not published.",
+  "devDependencies": {
+    "gsap": "3.14.2",
+    "hyperframes": "0.8.174"
+  }
+}

@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 
 from . import sprites as SP
-from .actions import ACTIONS
+from .actions import ACTIONS, STAGE_ACTIONS
 from .audio import tokens
 
 XF = 0.12  # seconds of crossfade between two poses
@@ -65,7 +65,7 @@ class Gesture:
 
     @property
     def kind(self) -> str:
-        return "walk" if self.action == "enter" else ("beat" if self.base is None else "pose")
+        return "beat" if self.base is None else "pose"
 
     @property
     def entra(self) -> float:
@@ -86,12 +86,10 @@ class Gesture:
 
     @property
     def apex(self) -> float:
-        return self.onset + (self.hold if self.kind == "walk" else self.entra)
+        return self.onset + self.entra
 
     def layer(self, t: float) -> tuple[str, int] | None:
         """(tag, frame index) shown by this gesture at time t, or None."""
-        if self.kind == "walk":
-            return "andando_w", SP.locate("andando_w", (t - self.onset) * 1000)
         if self.kind == "beat":
             return None
         dt = t - self.onset
@@ -132,22 +130,6 @@ class Choreography:
             ms = int(t * 1000)
             out.append(("parada_s", SP.locate("parada_s", ms), left))
         return out
-
-    def x_offset(self, t: float) -> float:
-        """Extra horizontal offset in screen pixels (walking in, leaning toward the slide)."""
-        x = 0.0
-        for g in self.gestures:
-            if not (g.onset <= t < g.end + 0.4):
-                continue
-            if g.kind == "walk":
-                if t < g.pose_end:
-                    p = min(1.0, (t - g.onset) / max(g.hold, 0.05))
-                    x += 450 * (1 - p) ** 3
-            elif g.action == "point_slide":
-                a = min(1.0, (t - g.onset) / 0.25)
-                b = min(1.0, max(0.0, (g.end - t) / 0.25))
-                x -= 50 * _smooth(min(a, b))
-        return x
 
     def y_offset(self, t: float) -> float:
         """Vertical bounce in screen pixels (explain_beat and the small settle at each gesture apex)."""
@@ -193,12 +175,8 @@ def scene_words(timeline, script, leads: list[float]) -> list[SceneWords]:
 
 
 def lead_for(scene, base_lead: float, cfg: dict) -> float:
-    """Lead-in before speech; a walk-in at the start needs time to finish before the first gesture."""
-    for c in scene.cues:
-        if c["do"] == "enter" and c.get("on") == "start":
-            hold = c.get("hold", ACTIONS["enter"][1])
-            return max(base_lead, hold + cfg["anticipation_ms"] / 1000 + 0.1)
-    return base_lead
+    """Silence before the narration of a scene (the scene's own `lead`, else the default)."""
+    return scene.lead if scene.lead is not None else base_lead
 
 
 def _find(words, phrase: str) -> int | None:
@@ -215,13 +193,11 @@ def _manual(sw: SceneWords, cfg: dict) -> list[Gesture]:
     out = []
     for c in sw.scene.cues:
         action = c["do"]
+        if action in STAGE_ACTIONS:
+            continue
         default = ACTIONS[action][1]
         hold = float(c.get("hold", default))
         label = c.get("on") if "on" in c else (f"word {c['word']}" if "word" in c else f"at {c['at']}")
-        if action == "enter":
-            g = Gesture(action, sw.start, hold, "manual", sw.index, "start", sw.start + sw.lead, f"{label}:{action}")
-            out.append(g)
-            continue
         if "on" in c and c["on"] == "start":
             t, word = sw.words[0][1], sw.words[0][0]
         elif "on" in c and c["on"] == "end":
@@ -325,7 +301,7 @@ def plan(script, timeline, cfg_user: dict | None = None, base_lead: float = 0.5,
                     if s0 - 0.05 <= g.word_t <= s1 + 0.05:
                         sent_span = (s0, s1)
                 if sent_span and any(m.scene == sw.index and sent_span[0] - 0.4 <= m.word_t <= sent_span[1] + 0.4 for m in manual
-                                     if m.action != "enter"):
+                                     if True):
                     continue
                 autos.append(g)
         for g in sorted(autos, key=lambda g: (PRIORITY.get(g.action, 9), g.onset)):
@@ -405,7 +381,7 @@ def _log(gestures: list[Gesture], manual_only: bool) -> list[dict]:
                 onset, apex, tag = h.word_t, h.word_t, g.base + "_s"
             else:
                 onset, apex = g.onset, g.apex
-                tag = (f"{g.base}_entra_s" if g.base else ("andando_w" if g.kind == "walk" else "(code bounce)"))
+                tag = f"{g.base}_entra_s" if g.base else "(code bounce)"
             rows.append({
                 "scene": h.scene + 1, "cue": h.cue or h.action, "do": h.action, "source": h.source, "word": h.word,
                 "pose": tag, "status": status,

@@ -12,6 +12,7 @@ from PIL import Image
 
 from . import audio as A
 from . import direction as D
+from . import stage as ST
 from .script import Script
 from .slides import H, W, background, caption_chunks, draw_caption, draw_slide
 from .sprites import Bit
@@ -80,7 +81,8 @@ def render(script: Script, engine, out: Path, fps: int = 30, work: Path | None =
     cfg = D.settings(script.direction)
     leads = [D.lead_for(sc, LEAD, cfg) for sc in script.scenes]
     track, timeline = A.build_track(script, engine, work, leads)
-    choreo = D.plan(script, timeline, cfg, LEAD, leads)
+    plan = ST.StagePlan(script, timeline, leads, LEAD)
+    choreo = plan.choreo
     total_s = len(track) / A.SR + 0.3
     wav = work / "narration.wav"
     write_wav(wav, track)
@@ -93,7 +95,7 @@ def render(script: Script, engine, out: Path, fps: int = 30, work: Path | None =
     proc = None if preview else subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
     bg, bit = background(), Bit(8)
-    stage = Stage(timeline, leads, track, fps, choreo)
+    stage = Stage(timeline, leads, track, fps, plan)
     n_frames = int(round(total_s * fps))
     snap = {}
     if snapshots and not preview:
@@ -122,7 +124,7 @@ def render(script: Script, engine, out: Path, fps: int = 30, work: Path | None =
                 slides[(scene_idx, shown)] = draw_slide(sc.slide, shown, bg).convert("RGBA")
             im = slides[(scene_idx, shown)].copy()
             sprite, pos = bit_image(bit, fs)
-            im.alpha_composite(sprite, pos) if pos[0] >= 0 else im.paste(sprite, pos, sprite)
+            im.paste(sprite, pos, sprite)
             if lines:
                 im.alpha_composite(draw_caption(list(lines)), (0, 880))
             fb = apply_camera(im.convert("RGB"), fs.camera)

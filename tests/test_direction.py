@@ -86,11 +86,8 @@ def test_scene_mood_shows_while_talking():
     assert any(g.action in ("happy_beat", "wave", "celebrate") for g in ch.gestures)
 
 
-def test_layers_weights_sum_to_one_and_enter_walks_in():
-    data = {"scenes": [scene("Hi there friend, welcome.", cues=[{"on": "start", "do": "enter", "hold": 0.7},
-                                                              {"on": "Hi", "do": "wave"}])]}
+def test_layers_weights_sum_to_one():
+    data = {"scenes": [scene("Hi there friend, welcome.", cues=[{"on": "Hi", "do": "wave"}])]}
     sc, tl, leads, ch = build(data)
-    assert leads[0] >= 0.9
     for i in range(0, 120):
         assert abs(sum(w for _, _, w in ch.layers(i / 30)) - 1) < 1e-6
-    assert ch.x_offset(0.0) > 300 and ch.x_offset(0.9) == 0     # starts off to the right, then arrives

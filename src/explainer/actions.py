@@ -22,5 +22,8 @@ ACTIONS: dict[str, tuple[str | None, float]] = {
     "happy_beat": ("feliz", 0.9),
     "surprise": ("surpresa", 1.0),
     "explain_beat": (None, 0.3),               # body bounce in code, no pose change
-    "enter": (None, 0.7),                      # walks in from the right edge
+    "look_slide": ("olhar_slide", 1.0),
 }
+
+# stage actions: where Bit is and which way he faces (handled by explainer.stage, not by gestures)
+STAGE_ACTIONS = ("enter", "walk_to", "exit", "turn")

@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from . import audio as A
-from .direction import Choreography
 from .slides import H, W
 from .sprites import MOUTHS
 
@@ -29,6 +28,7 @@ class BitState:
     x: float = BIT_CENTER_X                   # center of the sprite, screen pixels
     y: float = BIT_FEET_Y                     # feet line, screen pixels
     facing: str = "w"                         # w = faces the slide (left), e = faces right
+    shadow: float = 1.0                       # shadow scale
 
 
 @dataclass
@@ -64,11 +64,11 @@ def blink_times(total: float, every=(2.8, 4.5), seed: int = 7) -> list[float]:
 
 
 class Stage:
-    def __init__(self, timeline, leads: list[float], track: np.ndarray, fps: int, choreo: Choreography):
-        self.timeline, self.leads, self.fps, self.choreo = timeline, leads, fps, choreo
+    def __init__(self, timeline, leads: list[float], track: np.ndarray, fps: int, plan):
+        self.timeline, self.leads, self.fps, self.plan = timeline, leads, fps, plan
         self.levels = A.mouth_levels(track, fps)
         self.total = len(track) / A.SR
-        idle = choreo.cfg["idle"]
+        idle = plan.dcfg["idle"]
         self.idle = idle
         self.blinks = blink_times(self.total + 1, tuple(idle["blink_every_s"]))
         self._scene = 0
@@ -93,14 +93,15 @@ class Stage:
         lift = int(idle["breathe_px"]) if breathe > 0.0 else 0
         level = int(self.levels[q]) if q < len(self.levels) else 0
         blink = any(b <= t < b + 0.12 for b in self.blinks)
-        walking = any(g.kind == "walk" for g in self.choreo.active(t))
+        walking = self.plan.walking(t) is not None
         bit = BitState(
-            layers=self.choreo.layers(t),
+            layers=self.plan.layers(t),
             mouth=MOUTHS[level],
             blink=blink and not walking,
             lift=0 if walking else lift,
-            x=BIT_CENTER_X + sway + self.choreo.x_offset(t),
-            y=BIT_FEET_Y + self.choreo.y_offset(t),
-            facing=self.choreo.facing(t),
+            x=self.plan.x(t) + (0.0 if walking else sway),
+            y=BIT_FEET_Y + self.plan.y_offset(t),
+            facing="w",
+            shadow=self.plan.shadow(t),
         )
         return FrameState(q, t, i, st, self.leads[i], fade, bit)

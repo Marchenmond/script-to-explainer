@@ -156,16 +156,25 @@ def synth_scene(engine, text: str, cache: Path | None = None, key: str = "", pau
     return SceneAudio(samples, sentences, words)
 
 
-def build_track(script: Script, engine, cache: Path | None = None, lead: float | list[float] = 0.5):
+def build_track(script: Script, engine, cache: Path | None = None, lead: float | list[float] = 0.5, align: str | None = None):
     """Return (full float32 track, [(scene_start, scene_total, SceneAudio)]). `lead` may differ per scene."""
     leads = list(lead) if isinstance(lead, (list, tuple)) else [lead] * len(script.scenes)
     key = f"{engine.name}:{getattr(engine, 'voice', '')}:{getattr(engine, 'speed', '')}"
     expressive = script.voice.get("style", "expressive") != "plain"
+    mode = align or script.align
+    if mode == "auto":
+        from . import align as AL
+
+        mode = "whisper" if AL.available() else "proportional"
     if cache:
         cache.mkdir(parents=True, exist_ok=True)
     parts, timeline, t = [], [], 0.0
     for sc, lead in zip(script.scenes, leads):
         a = synth_scene(engine, sc.say, cache, key, script.pauses, sc.speed or 1.0, expressive)
+        if mode == "whisper":
+            from . import align as AL
+
+            AL.refine_scene(a, cache)
         total = lead + a.duration + sc.pause_after
         n = int(round(total * SR))
         buf = np.zeros(n, np.float32)
