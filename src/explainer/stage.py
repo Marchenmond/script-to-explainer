@@ -17,10 +17,11 @@ from .actions import ACTIONS, STAGE_ACTIONS
 from .slides import caption_chunks
 
 DEFAULT_STAGE = {
-    "stations": {"off": 2080, "R": 1700, "H": 1500, "M": 1320, "N": 1180},
+    "stations": {"off": 2080, "R": 1740, "H": 1500, "M": 1320, "N": 1180},
     "floor_y": 802,
-    "walk": {"speed_px_s": 240, "stride_px": None, "accel_s": 0.20, "decel_s": 0.25, "min_move_px": 120,
-             "min_speed_px_s": 200, "max_speed_px_s": 280, "settle_s": 0.15},
+    "walk": {"speed_px_s": 150, "stride_px": None, "accel_s": 0.20, "decel_s": 0.25, "min_move_px": 120,
+             "min_speed_px_s": 120, "max_speed_px_s": 200, "enter_exit_speed_px_s": 200, "settle_s": 0.15,
+             "snap": True},
     "timing": {"anticipation_ms": 200, "sync_tolerance_ms": 250, "min_stay_s": 2.0, "max_stay_s": 7.0},
     "springs": {"FAST": [14, 0.70], "MORPH": [9, 0.80], "SOFT": [6, 0.85], "CAM": [4.5, 1.00], "POP": [16, 0.56]},
     "views": {
@@ -35,7 +36,7 @@ DEFAULT_STAGE = {
         "highlight": {"w": 980, "h": 560, "radius": 56, "border": "gold"},
     },
     "background": {"grid_drift_px_s": -8, "blobs_drift_px_s": 3, "parallax_cam": [0.5, 0.3], "parallax_bit": -0.03,
-                   "parallax_bit_grid": -0.1},
+                   "parallax_bit_grid": -0.2},
     "idle_camera": {"zoom_to": 1.03, "period_s": 9, "pan_px": 12},
     "captions": {"bar": False, "style": "karaoke", "y": 940},
     "auto_rules": True,
@@ -66,11 +67,11 @@ def walk_steps(stride_px=None, tag: str = "andando_w") -> list[float]:
     """Body distance (px) to cover while each of the 6 walk frames shows.
 
     Default: calibrated on the sprite, 8 px (one screen pixel block per sprite pixel) for every sprite pixel the
-    soles move between two frames, at least 4 px, so the supporting foot stays put. A fixed `stride_px` gives six equal steps.
+    soles move between two frames, at least 8 px (one video frame at 240 px/s), so the supporting foot stays put. A fixed `stride_px` gives six equal steps.
     """
     if stride_px:
         return [stride_px / 6] * 6
-    return [max(8.0 * s, 4.0) for s in SP.sole_shifts(tag)]
+    return [max(8.0 * s, 8.0) for s in SP.sole_shifts(tag)]
 
 
 def walk_frame(dist: float, steps: list[float]) -> int:
@@ -222,7 +223,7 @@ class StagePlan:
             if do == "enter":
                 x0 = station_x(cfg, c.get("from", "off"), where)
                 x1 = station_x(cfg, c.get("x", "R"), where)
-                v, ta, td = w["speed_px_s"], w["accel_s"], w["decel_s"]
+                v, ta, td = w["enter_exit_speed_px_s"], w["accel_s"], w["decel_s"]
                 m = Move(max(0.0, t - 0.0) if c.get("on") == "start" else t - ant, x0, x1, v, ta, td, "walk", f"{c['on']}:enter",
                          station_name(cfg, x1), sw.index)
                 m.t0 = sw.start if c.get("on") == "start" else m.t0
@@ -244,7 +245,7 @@ class StagePlan:
                 if x is None:
                     x = self._x_before(t)
                 start = t + float(c.get("after_s", 0.0))
-                self._add_move(sw, c, start, x, x1, 240.0, "exit")
+                self._add_move(sw, c, start, x, x1, float(self.cfg["walk"]["enter_exit_speed_px_s"]), "exit")
                 x = x1
             if c.get("face"):
                 self.faces.append((max(0.0, t - ant), c["face"]))
@@ -287,7 +288,7 @@ class StagePlan:
         dur = walk_duration(dist, v, w["accel_s"], w["decel_s"])
         if deadline is not None and t0 + dur > deadline:
             t0 = max(floor, deadline - dur)
-            if t0 + dur > deadline:
+            if t0 + dur > deadline + 1e-6:
                 avail = deadline - floor
                 v = dist / max(avail - (w["accel_s"] + w["decel_s"]) / 2, 0.05)
                 if v > w["max_speed_px_s"]:
@@ -383,10 +384,26 @@ class StagePlan:
             if t >= m.t1:
                 x = m.x1
             elif t >= m.t0:
-                return m.x(t)
+                return self._snap(m, t) if m.kind == "walk" and self.cfg["walk"].get("snap") else m.x(t)
             else:
                 break
         return x
+
+    def _snap(self, m: Move, t: float) -> float:
+        """Body position moves in steps, one per walk frame, by exactly the distance the soles moved in the sprite:
+        the supporting foot then stays fixed on the ground while its frame shows (no skating)."""
+        tag = "andando_w" if m.direction < 0 else "andando_e"
+        steps = walk_steps(self.cfg["walk"]["stride_px"], tag)
+        d = m.travelled(t)
+        cycle = sum(steps)
+        base = (d // cycle) * cycle
+        r = d - base
+        acc = 0.0
+        for st in steps:
+            if r < acc + st:
+                break
+            acc += st
+        return m.x0 + m.direction * min(base + acc, m.dist)
 
     def walking(self, t: float) -> Move | None:
         m = self.move_at(t)
@@ -438,7 +455,12 @@ class StagePlan:
             z = min(max(float(v["zoom"]), 1.0), 1.15)
             cx = 960 + (self.x(t + 0.6) - 960) * float(v.get("cx_follow", 0.35)) if v["cx"] == "bit_x" else float(v["cx"])
             cy = float(v["cy"])
-            cx = min(max(cx, 960 / z), 1920 - 960 / z)
+            ic = self.cfg["idle_camera"]
+            zmax = z * ic["zoom_to"]
+            cap = 130 + 900 / zmax - ic["pan_px"]       # keep slide text (it starts at x=130) 60 px inside the left edge
+            cx = min(max(min(cx, cap), 960 / z), 1920 - 960 / z)
+            if 960 / z > cap + 0.5:
+                self.warnings.append(f"camera view {name!r} at zoom {z} cannot keep the slide text inside the 60 px margin; use a smaller zoom")
             cy = min(max(cy, 540 / z), 1080 - 540 / z)
             if out and t - out[-1]["t"] < 1.5 - 1e-6:
                 self.warnings.append(f"camera change at {t:.2f} s moved to {out[-1]['t'] + 1.5:.2f} s (min 1.5 s between changes)")

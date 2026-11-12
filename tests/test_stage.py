@@ -47,7 +47,7 @@ def test_walking_phase_follows_distance_not_clock():
         lay = plan.layers(t)
         tag, k, w = lay[0]
         assert tag == "andando_w" and k == ST.walk_frame(m.travelled(t), steps)
-    assert plan.x(0.0) == 2080 and abs(plan.x(m.t1 + 1) - 1700) < 1e-6
+    assert plan.x(0.0) == 2080 and abs(plan.x(m.t1 + 1) - plan.cfg['stations']['R']) < 1e-6
 
 
 def test_walk_to_starts_in_time_for_the_next_gesture():
@@ -109,3 +109,25 @@ def test_walk_steps_are_calibrated_on_the_sprite_and_cover_every_frame():
     seen = {ST.walk_frame(d, steps) for d in np.arange(0, sum(steps), 1.0)}
     assert seen == {0, 1, 2, 3, 4, 5}
     assert ST.walk_frame(sum(steps) + 1, steps) == ST.walk_frame(1, steps)    # cycles
+
+
+def test_snap_moves_the_body_by_exactly_the_sole_movement_of_each_frame():
+    plan, _ = plan_for({"scenes": [scene("Hello there my friend, welcome home to the show today.",
+                                         cues=[{"on": "Hello", "do": "enter", "from": "off", "x": "R"}])]})
+    m = plan.moves[0]
+    steps = ST.walk_steps(None, "andando_w")
+    xs = [plan.x(t) for t in np.arange(m.t0 + 0.3, m.t1 - 0.3, 1 / 30)]
+    jumps = [abs(b - a) for a, b in zip(xs, xs[1:]) if abs(b - a) > 1e-9]
+    assert jumps and all(any(abs(j - s) < 1e-6 for s in steps) for j in jumps)      # each jump = one frame's distance
+    assert min(steps) >= 8                                                          # no frame shorter than a video frame at 240 px/s
+    assert abs(plan.x(m.t1 + 0.01) - plan.cfg["stations"]["R"]) < 1e-6
+
+
+def test_camera_keeps_slide_text_inside_the_margin():
+    plan, _ = plan_for({"scenes": [scene("Hello there my friend, welcome home to the show.",
+                                         camera=[{"on": "friend", "view": "bit", "zoom": 1.1}])]})
+    ic = plan.cfg["idle_camera"]
+    for c in plan.camera:
+        zmax = c["zoom"] * ic["zoom_to"]
+        left = (130 - c["cx"]) * zmax + 960 - ic["pan_px"] * zmax     # slide text starts at x=130
+        assert left >= 60 - 0.5

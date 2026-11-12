@@ -85,7 +85,13 @@ A cue is anchored on a word of the narration: `"on"` takes a text (first occurre
 | `wave`, `bow_wave`, `point_slide`, `point_down`, `think_chin`, `celebrate`, `explain_open`, `shrug`, `look_slide`, `happy_beat`, `surprise` | a pose (`hold` seconds, `target` makes the pointer ring go there) |
 | `enter`, `walk_to`, `exit`, `turn` | stage: `x` is a station (`off`, `R`, `H`, `M`, `N`) or a number between 1090 and 1900, `face` is `camera` or `slide` |
 
-Without a cue the planner adds gestures by rule (greeting, question, goodbye, "this/here", numbers, long stretches). A walk that cannot be done before the next gesture is an error in `stage.report.json`, never a late gesture.
+Without a cue the planner adds gestures by rule (greeting, question, goodbye, "this/here", numbers, long stretches).
+
+**When a walk does not fit.** A `walk_to` starts when its word is said. If an arm gesture follows soon, the planner works backwards so Bit has arrived 0.15 s before it: it starts earlier (shortening the gesture before it down to about 0.6 s), then walks faster (up to `max_speed_px_s`, 200 by default; enter and exit use 200 too). If that still is not enough, the plan has an error: it is listed under `ERRO` in `out/demo.stage.report.json`, the render stops and nothing is delayed silently. The fix is in the script: anchor the walk on an earlier word, drop a gesture, or move the station. Two cases are not errors but are reported under `warnings`: a manual gesture whose start falls inside a walk is moved to the end of the walk, and an automatic gesture that would start inside a walk is dropped. Walks shorter than 120 px become a small weight shift instead of steps.
+
+**Walking without skating.** The six walking frames are shown for a distance equal to how far the soles move in the sprite (measured from the sheet, 80 px per cycle), and with `"snap": true` (default) the body moves in those steps, so the supporting foot stays fixed on the ground. At 150 px/s that is a step cycle of about 0.5 s. Set `"snap": false` for a smooth glide (the foot then drifts up to one sprite pixel).
+
+**Camera and margins.** Camera views are clamped so slide text stays at least 60 px inside the frame, including the slow breathing zoom; `python -m explainer check` measures every visible piece of text in Chrome to confirm it.
 
 `camera`: `{ "on", "view": "wide|slide|bit|caption", "zoom" }`. `emph`: `{ "on", "target": "title|subtitle|highlight|item:N|word:text", "style": "mark|pop" }`. `reveal`: `{ "item", "on" }` (when a bullet appears). `count`: `{ "item" or "target": "badge", "from", "to", "on", "ms" }` (a number that counts up). The `stage` block of `examples/demo.json` shows every tunable (stations, walking speed, springs, camera views, card shapes, background).
 
@@ -106,7 +112,7 @@ Set `EXPLAINER_MODELS` to keep the Kokoro model files somewhere else (default: `
 - Bit is the only character, and the slides are the three built-in types. Custom layouts mean editing `src/explainer/hf/`.
 - Word timing without the optional `align` extra is estimated (about 250 ms error), so a gesture can land slightly off its word.
 - A 1080p render of a one-minute script takes a few minutes on a laptop CPU; the first run also downloads the voice model.
-- Tested on Windows; Linux and macOS should work but have not been exercised.
+- Developed and run on Windows; Linux and macOS should work but have not been exercised.
 
 ## Tests
 

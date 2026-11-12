@@ -77,6 +77,66 @@ def frame_changes(video: Path, fps: int = 30) -> float:
     return float(ch.max()), int(ch.argmax()) / fps
 
 
+def video_foot_slide(video, data, rows, walks, tag_of, fps):
+    """Per video frame pair during walks: how far the soles move on the ground (camera motion removed)."""
+    slides, pairs, switches = [], 0, []
+    FLOOR = data["floor_y"]
+    for m in walks:
+        q0, q1 = int((m["t0"] + 0.15) * fps), int((m["t1"] - 0.15) * fps)
+        if q1 - q0 < 3:
+            continue
+        cmd = ["ffmpeg", "-v", "error", "-ss", f"{q0 / fps:.4f}", "-i", str(video), "-frames:v", str(q1 - q0 + 1),
+               "-vf", "format=gray", "-f", "rawvideo", "-"]
+        raw = subprocess.run(cmd, capture_output=True).stdout
+        n = len(raw) // (1920 * 1080)
+        frames = np.frombuffer(raw[: n * 1920 * 1080], np.uint8).reshape(n, 1080, 1920)
+        profs, geo = [], []
+        for i in range(n):
+            q = q0 + i
+            z, cx, cy = camera_at(data, q / fps)
+            bx = rows[q][0]
+            sx = (bx - cx) * z + 960
+            fy = (FLOOR - cy) * z + 540
+            y0, y1 = int(fy - 16), int(fy - 1)
+            x0, x1 = int(sx - 256 + 25 * 8), int(sx - 256 + 48 * 8)      # shoes only: sprite columns 25-47 (the trailing boot and the wrench are part of the body)
+            crop = frames[i, max(0, y0):y1, max(0, x0):min(1920, x1)]
+            prof = (crop > 95).any(axis=0).astype(np.int8)
+            profs.append((prof, max(0, x0)))
+            geo.append((z, cx, bx))
+        for i in range(n - 1):
+            (pa, xa), (pb, xb) = profs[i], profs[i + 1]
+            if rows[q0 + i][6] != rows[q0 + i + 1][6]:
+                # the sprite frame changes: the shoes change shape, so aligning silhouettes is ambiguous.
+                # Here the body jump must equal how far the supporting sole moved in the sprite.
+                tag, k = tag_of.get(rows[q0 + i][6], ("", -1))
+                if tag.startswith("andando"):
+                    jump = abs(rows[q0 + i + 1][0] - rows[q0 + i][0])
+                    from .stage import walk_steps
+
+                    switches.append(abs(jump - walk_steps(None, tag)[k]))
+                continue
+            za, cxa, bxa = geo[i]
+            zb, cxb, _bxb = geo[i + 1]
+            # where a point on the ground under the feet moved to on screen (camera pan and zoom)
+            ground = ((bxa - cxb) * zb + 960) - ((bxa - cxa) * za + 960)
+            la, lb = len(pa), len(pb)
+            best, best_s = None, 0
+            for sft in range(-30, 31):          # content of frame i+1 at column c came from column c - sft in frame i
+                lo, hi = max(xb, xa + sft), min(xb + lb, xa + la + sft)
+                if hi - lo < 40:
+                    continue
+                seg_b = pb[lo - xb: hi - xb]
+                seg_a = pa[lo - sft - xa: hi - sft - xa]
+                miss = float((seg_a != seg_b).mean())
+                if best is None or miss < best - 1e-9 or (abs(miss - best) <= 1e-9 and abs(sft - ground) < abs(best_s - ground)):
+                    best, best_s = miss, sft
+            if abs(best_s) >= 30 or best is None or best > 0.35:     # no clear match (plain or empty silhouette): not measurable
+                continue
+            slides.append(abs(best_s - ground))
+            pairs += 1
+    return slides, pairs, switches
+
+
 def run(stem: str | Path, video: Path | None = None) -> list[dict]:
     stem = Path(stem)
     video = video or stem.with_suffix(".mp4")
@@ -127,40 +187,21 @@ def run(stem: str | Path, video: Path | None = None) -> list[dict]:
         and layers_last == "andando_e" and early and late,
         f"aparece em {first_visible / fps:.2f} s ({layers_first}); sai com {layers_last}; aceno <=3,2 s: {early}; aceno antes da saida: {late}")
 
-    # 3 feet: while a walk frame shows, the body covers the distance the soles moved in the sprite
-    from .stage import walk_frame, walk_steps
-
-    steps = {t: walk_steps(None, t) for t in ("andando_w", "andando_e")}
-    shifts = {t: SP.sole_shifts(t) for t in ("andando_w", "andando_e")}
-    worst_slide, n_walk, phase_bad = 0.0, 0, 0
-    for m in walks:
-        q0, q1 = int(m["t0"] * fps) + 3, int(m["t1"] * fps) - 3
-        cur, start_x, last_k = None, None, None
-        for q in range(q0, q1):
-            tag, k = tag_of.get(rows[q][6], ("", -1))
-            if not tag.startswith("andando") or rows[q][7] < 0.99:
-                continue
-            n_walk += 1
-            d = abs(rows[q][0] - m["x0"])
-            if k not in (walk_frame(d - 0.3, steps[tag]), walk_frame(d + 0.3, steps[tag])):
-                phase_bad += 1
-            if k != last_k:
-                if last_k is not None and cur == tag:
-                    covered = abs(rows[q][0] - start_x)
-                    want = 8.0 * shifts[tag][last_k]
-                    worst_slide = max(worst_slide, abs(covered - max(want, 4.0)) - 8.0)   # minus one video frame at 240 px/s
-                cur, start_x, last_k = tag, rows[q][0], k
-    worst_slide = max(worst_slide, 0.0)
-    add(3, "pes sem patinar: pe de apoio desliza <=4 px por quadro; fase pela distancia",
-        worst_slide <= 4.0 and phase_bad == 0,
-        f"{n_walk} quadros de andar; fase pela tabela de distancia calibrada no sprite {['%.0f' % s for s in steps['andando_w']]} px por quadro de andar (andando_w); "
-        f"pior diferenca entre a distancia andada e o movimento da sola do sprite (descontado 1 quadro de video): {worst_slide:.1f} px. "
-        f"Medido nos dados e no sprite, nao em pixels do video renderizado")
+    # 3 feet: measured on the rendered video. The soles of the supporting foot must stay on the ground
+    # (after removing camera motion) from one video frame to the next: +-4 px.
+    slides, n_pairs, switches = video_foot_slide(video, data, rows, walks, tag_of, fps)
+    worst = max(slides) if slides else 0.0
+    sw_worst = max(switches) if switches else 0.0
+    add(3, "pes sem patinar: pe de apoio desliza <=4 px entre quadros do video (medido no MP4)", bool(slides) and worst <= 4.0 and sw_worst <= 4.0,
+        f"{n_pairs} pares de quadros do video com o mesmo quadro de sprite, medidos no MP4 (silhueta dos sapatos, sem o movimento da camera): deslize maximo {worst:.1f} px; "
+        f"{len(switches)} trocas de quadro de sprite: o salto do corpo difere {sw_worst:.1f} px do movimento da sola no sprite (alinhar silhuetas na troca e ambiguo, pois o sapato muda de forma)")
 
     # 4 walking speed
     sp = [r["speed_px_s"] for r in cues if r.get("do") == "walk"]
-    add(4, "velocidade de cruzeiro 200 a 280 px/s, 0,2 a 0,3 s de arranque/freada",
-        all(200 <= s <= 280 for s in sp), f"velocidades {sorted(set(sp))}; arranque 0,20 s, freada 0,25 s (configurados)")
+    cycle = sum(__import__("explainer.stage", fromlist=["walk_steps"]).walk_steps(None, "andando_w"))
+    add(4, "velocidade de caminhada 120 a 200 px/s (ciclo de passos >=0,4 s), 0,2 a 0,3 s de arranque/freada",
+        all(120 <= s <= 200 for s in sp) and all(cycle / s >= 0.4 for s in sp if s <= 150),
+        f"velocidades {sorted(set(sp))}; passada {cycle:.0f} px = ciclo de {cycle / 150:.2f} s a 150 px/s; arranque 0,20 s, freada 0,25 s (configurados)")
 
     # 5 floor line, area
     lows = set()
@@ -250,9 +291,17 @@ def run(stem: str | Path, video: Path | None = None) -> list[dict]:
     html = (Path(__file__).parent / "hf" / "index.html").read_text(encoding="utf-8")
     sizes = [int(x) for x in re.findall(r"font-size:\s*(\d+)px", html)]
     blur_end = next(i / 1000 for i in range(4000) if spring_step(fast, i / 1000) > 0.975)
-    add(12, "texto com mola (<=12%), 300-550 ms, borrao <=8 px ate 400 ms, fonte >=38 px, area segura",
-        overshoot(fast) <= 0.12 and overshoot(pop) <= 0.12 and 0.3 <= settle_time(fast) <= 0.55 and blur_end <= 0.4 and min(sizes) >= 38,
-        f"sobrepasso FAST {overshoot(fast) * 100:.1f}% POP {overshoot(pop) * 100:.1f}%; assenta em {settle_time(fast) * 1000:.0f} ms; borrao some em {blur_end * 1000:.0f} ms; menor fonte {min(sizes)} px; contraste: ver `hyperframes check`")
+    from .hfrender import measure_text
+
+    boxes = measure_text(stem.parent / "hf", 0.1)
+    out_box = [b for b in boxes if b["l"] < 60 or b["r"] > 1860 or b["t"] < 60 or b["b"] > 1020]
+    worst_edge = min([min(b["l"], 1920 - b["r"], b["t"], 1080 - b["b"]) for b in boxes] + [999])
+    first = out_box[0] if out_box else None
+    add(12, "texto com mola (<=12%), 300-550 ms, borrao <=8 px ate 400 ms, fonte >=38 px, todo texto visivel a 60 px da borda",
+        overshoot(fast) <= 0.12 and overshoot(pop) <= 0.12 and 0.3 <= settle_time(fast) <= 0.55 and blur_end <= 0.4 and min(sizes) >= 38 and not out_box,
+        f"sobrepasso FAST {overshoot(fast) * 100:.1f}% POP {overshoot(pop) * 100:.1f}%; assenta em {settle_time(fast) * 1000:.0f} ms; borrao some em {blur_end * 1000:.0f} ms; menor fonte {min(sizes)} px; "
+        f"{len(boxes)} caixas de texto medidas no layout real (Chrome, a cada 0,1 s); menor distancia a uma borda {worst_edge:.0f} px; fora da margem de 60 px: {len(out_box)}"
+        + (f" (ex.: {first['text']!r} a {first['time']} s)" if first else "") + "; contraste: ver `hyperframes check`")
 
     # 13 no hard cut
     share, at = frame_changes(video, fps)

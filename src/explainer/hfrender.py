@@ -39,6 +39,28 @@ def hyperframes_cmd() -> list[str]:
     return [node, str(mjs)]
 
 
+def chrome_path() -> str:
+    """Chrome used by HyperFrames (downloaded on first use)."""
+    r = subprocess.run([*hyperframes_cmd(), "browser", "path"], capture_output=True, text=True,
+                       env={**os.environ, "HYPERFRAMES_NO_TELEMETRY": "1"})
+    return r.stdout.strip().splitlines()[-1]
+
+
+def measure_text(proj: Path, step: float = 0.2) -> list[dict]:
+    """Real text boxes (slide text and captions) over time, measured in Chrome on the composition."""
+    node = shutil.which("node")
+    script = PKG / "hf" / "measure.mjs"
+    tmp = repo_root() / "node_modules" / ".measure.mjs"      # must live where `puppeteer-core` resolves
+    shutil.copy(script, tmp)
+    try:
+        r = subprocess.run([node, str(tmp), str(proj), chrome_path(), str(step)], capture_output=True, text=True)
+    finally:
+        tmp.unlink(missing_ok=True)
+    if r.returncode != 0:
+        raise RuntimeError("text measurement failed: " + r.stderr[-400:])
+    return json.loads(r.stdout)
+
+
 def blink_sheet(src: Path, dst: Path) -> None:
     """Same layout as the pose sheet, with the eyes closed on every frame that has open eyes."""
     sheet = Image.open(src).convert("RGBA")

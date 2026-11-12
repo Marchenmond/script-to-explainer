@@ -117,7 +117,7 @@ class Bit:
 def sole_shifts(tag: str) -> tuple[int, ...]:
     """How far (sprite pixels) the soles move between each frame of a walk tag and the next one (wraps around).
 
-    Measured on the two bottom rows of the sheet: the shift that best lines the soles of frame k up with
+    Measured on the two bottom rows (sole level, below the wrench) of the sheet: the shift that best lines the soles of frame k up with
     frame k+1. This is how far the body must travel while frame k shows so the supporting foot does not skate.
     """
     import numpy as np
@@ -128,7 +128,7 @@ def sole_shifts(tag: str) -> tuple[int, ...]:
         i = f["i"]
         x, y = (i % 16) * CELL, (i // 16) * CELL
         a = np.array(sheet.crop((x, y, x + CELL, y + CELL)))[:, :, 3] > 0
-        frames.append(a[56:59])
+        frames.append(a[57:59])
     out = []
     for k, a in enumerate(frames):
         b = frames[(k + 1) % len(frames)]

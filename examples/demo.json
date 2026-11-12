@@ -10,18 +10,22 @@
   "stage": {
     "stations": {
       "off": 2080,
-      "R": 1700,
+      "R": 1740,
       "H": 1500,
       "M": 1320,
       "N": 1180
     },
     "floor_y": 802,
     "walk": {
-      "speed_px_s": 240,
+      "speed_px_s": 150,
       "stride_px": null,
       "accel_s": 0.2,
       "decel_s": 0.25,
-      "min_move_px": 120
+      "min_move_px": 120,
+      "min_speed_px_s": 120,
+      "max_speed_px_s": 200,
+      "enter_exit_speed_px_s": 200,
+      "snap": true
     },
     "timing": {
       "anticipation_ms": 200,
@@ -103,7 +107,7 @@
         0.3
       ],
       "parallax_bit": -0.03,
-      "parallax_bit_grid": -0.1
+      "parallax_bit_grid": -0.2
     },
     "idle_camera": {
       "zoom_to": 1.03,
@@ -113,13 +117,13 @@
     "captions": {
       "bar": false,
       "style": "karaoke",
-      "y": 940
+      "y": 923
     },
     "auto_rules": true
   },
   "scenes": [
     {
-      "lead": 1.8,
+      "lead": 2.2,
       "say": "Hi... I'm Bit. Today I'll show you how to turn a script... into an explainer video!",
       "emotion": "happy",
       "camera": [
@@ -200,12 +204,6 @@
       "cues": [
         {
           "on": "You write",
-          "action": "explain_open",
-          "face": "camera",
-          "hold": 1.0
-        },
-        {
-          "on": "short script",
           "action": "walk_to",
           "x": "N",
           "face": "slide"
@@ -250,7 +248,7 @@
       "reveal": [
         {
           "item": 0,
-          "on": "the words I say"
+          "on": "short script"
         },
         {
           "item": 1,
@@ -293,16 +291,10 @@
           "hold": 1.3
         },
         {
-          "on": "generated locally",
-          "action": "look_slide",
-          "face": "slide",
-          "hold": 1.0
-        },
-        {
-          "on": "nothing",
+          "on": "The voice",
           "action": "walk_to",
           "x": "M",
-          "face": "camera"
+          "face": "slide"
         },
         {
           "on": "your machine",
@@ -452,12 +444,6 @@
           "action": "walk_to",
           "x": "H",
           "face": "camera"
-        },
-        {
-          "on": "tell your story",
-          "action": "explain_open",
-          "face": "camera",
-          "hold": 1.2
         }
       ],
       "emph": [
@@ -514,10 +500,10 @@
           "hold": 1.6
         },
         {
-          "on": "swappable",
-          "action": "look_slide",
-          "face": "slide",
-          "hold": 1.0
+          "on": "speech engine",
+          "action": "walk_to",
+          "x": 1380,
+          "face": "slide"
         },
         {
           "on": "Kokoro",
@@ -547,7 +533,7 @@
       "reveal": [
         {
           "item": 0,
-          "on": "Kokoro"
+          "on": "voice"
         },
         {
           "item": 1,
@@ -570,11 +556,6 @@
       "camera": [
         {
           "on": "Write the script",
-          "view": "bit",
-          "zoom": 1.05
-        },
-        {
-          "on": "end",
           "view": "wide"
         }
       ],
@@ -592,7 +573,7 @@
           "face": "camera"
         },
         {
-          "on": "share your video",
+          "on": "your video",
           "action": "wave",
           "face": "camera",
           "hold": 1.4
