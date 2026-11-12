@@ -1,0 +1,89 @@
+{
+  "title": "Turn a script into an explainer video",
+  "voice": {
+    "engine": "kokoro",
+    "voice": "af_heart",
+    "speed": 1.0
+  },
+  "scenes": [
+    {
+      "say": "Hi, I'm Bit. Today I'll show you how to turn a script into an explainer video.",
+      "emotion": "happy",
+      "slide": {
+        "type": "title",
+        "kicker": "script-to-explainer",
+        "title": "Script in,\nvideo out",
+        "subtitle": "One JSON file. One command."
+      }
+    },
+    {
+      "say": "You write a short script. Each scene has the words I say, a slide, and how I feel about it.",
+      "emotion": "pointing",
+      "slide": {
+        "type": "bullets",
+        "title": "A scene is simple",
+        "items": [
+          "The narration",
+          "A slide to show",
+          "My mood: neutral, happy, thinking or pointing"
+        ]
+      }
+    },
+    {
+      "say": "Then you run one command. The voice is generated locally, so nothing leaves your machine.",
+      "emotion": "neutral",
+      "slide": {
+        "type": "highlight",
+        "title": "Render it",
+        "highlight": "python -m explainer render demo.json",
+        "subtitle": "Local voice. No cloud needed."
+      }
+    },
+    {
+      "say": "Captions are timed to the narration, and my mouth follows the voice. Not bad for a little robot.",
+      "emotion": "happy",
+      "slide": {
+        "type": "bullets",
+        "title": "Done for you",
+        "items": [
+          "Narration in English",
+          "Captions that match the voice",
+          "Slides at 1080p"
+        ]
+      }
+    },
+    {
+      "say": "There are three slide types: a title card, a list that reveals one item at a time, and a big highlight for the key idea. Mix them to tell your story.",
+      "emotion": "pointing",
+      "slide": {
+        "type": "highlight",
+        "title": "Three slide types",
+        "highlight": "title, bullets, highlight",
+        "subtitle": "Mix them freely."
+      }
+    },
+    {
+      "say": "Want a different voice? The speech engine is swappable. Kokoro runs offline, and Azure Speech is optional.",
+      "emotion": "thinking",
+      "slide": {
+        "type": "bullets",
+        "title": "Swap the voice",
+        "items": [
+          "Kokoro: local, free",
+          "Azure Speech: optional, via environment variables"
+        ]
+      }
+    },
+    {
+      "say": "That's it. Write the script, run the command, and share your video.",
+      "emotion": "happy",
+      "pause_after": 1.0,
+      "slide": {
+        "type": "title",
+        "kicker": "Try it",
+        "title": "Your turn",
+        "subtitle": "Edit examples/demo.json and render again."
+      }
+    }
+  ]
+}
