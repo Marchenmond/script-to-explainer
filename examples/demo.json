@@ -2,13 +2,52 @@
   "title": "Turn a script into an explainer video",
   "voice": {
     "engine": "kokoro",
-    "voice": "af_heart",
-    "speed": 1.0
+    "voice": "am_fenrir",
+    "speed": 1.0,
+    "style": "expressive"
+  },
+  "direction": {
+    "anticipation_ms": 200,
+    "min_gap_ms": 1500,
+    "max_hold_same_pose_s": 3.5,
+    "auto_rules": true,
+    "transition_ms": 300,
+    "idle": {
+      "breathe_px": 1,
+      "breathe_period_s": 3.2,
+      "blink_every_s": [
+        2.8,
+        4.5
+      ],
+      "sway_px": 6
+    }
   },
   "scenes": [
     {
-      "say": "Hi, I'm Bit. Today I'll show you how to turn a script into an explainer video.",
+      "say": "Hi... I'm Bit. Today I'll show you how to turn a script... into an explainer video!",
       "emotion": "happy",
+      "cues": [
+        {
+          "on": "start",
+          "do": "enter",
+          "hold": 0.7
+        },
+        {
+          "on": "Hi",
+          "do": "wave",
+          "hold": 1.3
+        },
+        {
+          "on": "Today",
+          "do": "turn_slide",
+          "hold": 0.4
+        },
+        {
+          "on": "explainer video",
+          "do": "point_slide",
+          "hold": 1.2
+        }
+      ],
       "slide": {
         "type": "title",
         "kicker": "script-to-explainer",
@@ -18,7 +57,34 @@
     },
     {
       "say": "You write a short script. Each scene has the words I say, a slide, and how I feel about it.",
-      "emotion": "pointing",
+      "emotion": "neutral",
+      "cues": [
+        {
+          "on": "You write",
+          "do": "explain_open",
+          "hold": 1.0
+        },
+        {
+          "on": "Each scene",
+          "do": "point_slide",
+          "hold": 0.9
+        },
+        {
+          "on": "the words I say",
+          "do": "point_self",
+          "hold": 0.8
+        },
+        {
+          "on": "a slide",
+          "do": "point_slide",
+          "hold": 0.9
+        },
+        {
+          "on": "how I feel",
+          "do": "happy_beat",
+          "hold": 0.9
+        }
+      ],
       "slide": {
         "type": "bullets",
         "title": "A scene is simple",
@@ -30,8 +96,25 @@
       }
     },
     {
-      "say": "Then you run one command. The voice is generated locally, so nothing leaves your machine.",
+      "say": "Then you run ONE command. The voice is generated locally, so nothing... leaves your machine!",
       "emotion": "neutral",
+      "cues": [
+        {
+          "on": "one command",
+          "do": "point_slide",
+          "hold": 1.2
+        },
+        {
+          "on": "generated locally",
+          "do": "explain_open",
+          "hold": 1.0
+        },
+        {
+          "on": "nothing",
+          "do": "shrug",
+          "hold": 0.9
+        }
+      ],
       "slide": {
         "type": "highlight",
         "title": "Render it",
@@ -42,6 +125,23 @@
     {
       "say": "Captions are timed to the narration, and my mouth follows the voice. Not bad for a little robot.",
       "emotion": "happy",
+      "cues": [
+        {
+          "on": "Captions",
+          "do": "point_down",
+          "hold": 1.2
+        },
+        {
+          "on": "my mouth",
+          "do": "point_self",
+          "hold": 1.0
+        },
+        {
+          "on": "Not bad",
+          "do": "celebrate",
+          "hold": 1.3
+        }
+      ],
       "slide": {
         "type": "bullets",
         "title": "Done for you",
@@ -54,7 +154,34 @@
     },
     {
       "say": "There are three slide types: a title card, a list that reveals one item at a time, and a big highlight for the key idea. Mix them to tell your story.",
-      "emotion": "pointing",
+      "emotion": "neutral",
+      "cues": [
+        {
+          "on": "three slide types",
+          "do": "point_slide",
+          "hold": 1.2
+        },
+        {
+          "on": "a title card",
+          "do": "point_slide",
+          "hold": 0.8
+        },
+        {
+          "on": "a list",
+          "do": "point_slide",
+          "hold": 0.8
+        },
+        {
+          "on": "a big highlight",
+          "do": "point_slide",
+          "hold": 1.0
+        },
+        {
+          "on": "Mix them",
+          "do": "explain_open",
+          "hold": 1.2
+        }
+      ],
       "slide": {
         "type": "highlight",
         "title": "Three slide types",
@@ -65,6 +192,28 @@
     {
       "say": "Want a different voice? The speech engine is swappable. Kokoro runs offline, and Azure Speech is optional.",
       "emotion": "thinking",
+      "cues": [
+        {
+          "on": "Want a different voice?",
+          "do": "think_chin",
+          "hold": 1.6
+        },
+        {
+          "on": "swappable",
+          "do": "explain_open",
+          "hold": 1.0
+        },
+        {
+          "on": "Kokoro runs offline",
+          "do": "point_slide",
+          "hold": 1.0
+        },
+        {
+          "on": "Azure Speech is optional",
+          "do": "point_slide",
+          "hold": 1.2
+        }
+      ],
       "slide": {
         "type": "bullets",
         "title": "Swap the voice",
@@ -78,6 +227,28 @@
       "say": "That's it. Write the script, run the command, and share your video.",
       "emotion": "happy",
       "pause_after": 1.0,
+      "cues": [
+        {
+          "on": "That's it",
+          "do": "celebrate",
+          "hold": 1.0
+        },
+        {
+          "on": "Write the script",
+          "do": "explain_open",
+          "hold": 0.9
+        },
+        {
+          "on": "share your video",
+          "do": "wave",
+          "hold": 1.4
+        },
+        {
+          "on": "end",
+          "do": "bow_wave",
+          "hold": 1.0
+        }
+      ],
       "slide": {
         "type": "title",
         "kicker": "Try it",
@@ -85,5 +256,15 @@
         "subtitle": "Edit examples/demo.json and render again."
       }
     }
-  ]
+  ],
+  "pauses": {
+    "comma": 0.2,
+    "semicolon": 0.25,
+    "colon": 0.25,
+    "dash": 0.25,
+    "ellipsis": 0.5,
+    "period": 0.45,
+    "question": 0.45,
+    "exclaim": 0.5
+  }
 }

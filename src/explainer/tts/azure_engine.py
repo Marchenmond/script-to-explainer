@@ -21,12 +21,14 @@ class AzureEngine:
         self.speed = float(speed)
         self.rate = f"{round((self.speed - 1) * 100):+d}%"
 
-    def synthesize(self, text: str) -> tuple[np.ndarray, int]:
+    def synthesize(self, text: str, speed: float | None = None) -> tuple[np.ndarray, int]:
         import soundfile as sf
+
+        rate = self.rate if speed is None else f"{round((float(speed) - 1) * 100):+d}%"
 
         ssml = (
             "<speak version='1.0' xml:lang='en-US'>"
-            f"<voice name='{self.voice}'><prosody rate='{self.rate}'>{escape(text)}</prosody></voice></speak>"
+            f"<voice name='{self.voice}'><prosody rate='{rate}'>{escape(text)}</prosody></voice></speak>"
         )
         req = urllib.request.Request(
             f"https://{self.region}.tts.speech.microsoft.com/cognitiveservices/v1",
